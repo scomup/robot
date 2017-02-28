@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# coding:utf-8
 import rospy
 import serial
 import string
@@ -48,7 +50,8 @@ class imuListener(threading.Thread):
         self.angular_velocity_x = self.angular_velocity_x + data.linear_acceleration.x * self.diffStamp
         self.angular_velocity_y = self.angular_velocity_y + data.linear_acceleration.y * self.diffStamp
         self.angular_velocity_z = self.angular_velocity_z + data.linear_acceleration.z * self.diffStamp
-        print self.angular_velocity_x,self.angular_velocity_y
+        v = math.sqrt(self.angular_velocity_x**2+self.angular_velocity_y**2)
+        print  "x:%5.2f y:%5.2f v:%5.2f" % (self.angular_velocity_x,self.angular_velocity_y,v)
 
     def shutdown(self):
         rospy.loginfo("Stopping the robot (scan)...")
