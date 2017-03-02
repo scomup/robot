@@ -41,8 +41,10 @@ class odomListener(threading.Thread):
         rospy.spin()
 
     def callback_Odom(self, data):
-        self.x = data.pose.pose.position.x  + np.random.normal(0, 0.1)
-        self.y = data.pose.pose.position.y  + np.random.normal(0, 0.1)
+        self.x = data.pose.pose.position.x  + np.random.normal(0, 0.3)
+        self.y = data.pose.pose.position.y  + np.random.normal(0, 0.3)
+        self.rx = data.pose.pose.position.x
+        self.ry = data.pose.pose.position.y
 
     def shutdown(self):
         rospy.loginfo("Stopping the robot odomListener...")
@@ -91,7 +93,7 @@ class kelman(threading.Thread):
         self.H = np.matrix(
             [[1.0, 0.0, 0.0, 0.0, 0.0],
              [0.0, 1.0, 0.0, 0.0, 0.0]])
-        varGPS = 6.0  # Standard Deviation of GPS Measurement
+        varGPS = 100.0  # Standard Deviation of GPS Measurement
         varspeed = 1.0  # Variance of the speed measurement
         varyaw = 0.1  # Variance of the yawrate measurement
         self.R = np.matrix([[varGPS**2, 0.0],
@@ -169,6 +171,36 @@ class kelman(threading.Thread):
         # ========================
 
 
+class drawer(threading.Thread):
+    
+    def __init__(self, ekf, pose):
+        threading.Thread.__init__(self)
+        self.setDaemon(True)
+        self.ekf = ekf
+        self.pose = pose
+        self.flag = True
+
+    def run(self):
+        try:
+            plt.show(block=False)
+            while True:
+                plt.scatter(self.ekf.x[0], self.ekf.x[1], s=10, label='Kelman filter result', c='g')
+                plt.scatter(self.ekf.px[0], self.ekf.px[1], s=10, marker = 'x', label='Pose predicted by odom', c='b')
+                plt.scatter(self.pose.x, self.pose.y, s=10, marker = 'o', label='Measurement with noise', c='c')
+                plt.scatter(self.pose.rx, self.pose.ry, s=10, marker = 'o', label='real', c='r')
+                plt.draw()
+                if self.flag == True:
+                    plt.legend()
+                    self.flag = False
+                plt.pause(0.1)
+        except KeyboardInterrupt:
+            print 'interrupted!'
+
+
+
+
+
+
 if __name__ == '__main__':
     rospy.init_node('kelman', anonymous=False)
     fig = plt.figure(figsize=(9, 9))
@@ -180,14 +212,6 @@ if __name__ == '__main__':
     cmd.start()
     ekf = kelman(cmd, pose)
     ekf.start()
-
-    try:
-        plt.show(block=False)
-        while True:
-            plt.scatter(ekf.x[0], ekf.x[1], s=10, label='ekf', c='r')
-            plt.scatter(ekf.px[0], ekf.px[1], s=10, marker = 'x', label='prediction', c='g')
-            plt.scatter(pose.x, pose.y, s=10, marker = '^', label='prediction', c='b')
-            plt.draw()
-            plt.pause(0.1)
-    except KeyboardInterrupt:
-        print 'interrupted!'
+    drawer = drawer(ekf, pose)
+    drawer.start()
+    plt.show()
