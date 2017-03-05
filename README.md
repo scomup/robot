@@ -18,5 +18,5 @@ Launch a world.
 Launch ORB_SLAM with odometry.  
 $roslaunch RunWithTf_MyRobot.launch  
 (https://github.com/scomup/ORB_SLAM_with_odometry)  
-$./tfreader.py  
+$./evaluator.py  
 
