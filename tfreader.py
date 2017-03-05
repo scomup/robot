@@ -17,9 +17,13 @@ import matplotlib.pyplot as plt
 class tfListener(threading.Thread):
     def __init__(self):  
         threading.Thread.__init__(self)
+        self.setDaemon(True)
         self.listener = tf.TransformListener()
-        print 'Waiting for tf ...'
-        self.listener.waitForTransform('ORB_SLAM/World', 'ORB_SLAM/Robot', rospy.Time(), rospy.Duration(60.0))
+        print 'Waiting for tf(1) ... (Max 10 minute)'
+        self.listener.waitForTransform('ORB_SLAM/World', 'ORB_SLAM/Robot', rospy.Time(), rospy.Duration(60.0*10))
+        print 'Waiting for tf(2) ... (Max 10 minute)'
+        self.listener.waitForTransform('myRobot/odom', 'myRobot/base_link', rospy.Time(), rospy.Duration(60.0*10))
+        print 'ALL OK ...'
         self.ox = 0
         self.oy = 0
         self.flag = True
@@ -67,7 +71,6 @@ if __name__ == '__main__':
         axes.set_ylim([-3, 10])
         tf = tfListener()
         tf.start()
-        plt.draw()
         plt.show()
     except KeyboardInterrupt:
         print 'interrupted!'
