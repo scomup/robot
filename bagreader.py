@@ -15,9 +15,11 @@ from geometry_msgs.msg import *
 
 
 class BagReader:
-    def __init__(self, bagfile, scan_topic, odom_topic):
+    def __init__(self, bagfile, scan_topic, odom_topic, start_time, end_time):
         self.scan_topic = scan_topic
         self.odom_topic = odom_topic
+        self.start_time = start_time
+        self.end_time = end_time
         self.points = []
         self.odoms = []
         self.data = []
@@ -27,8 +29,9 @@ class BagReader:
         self.readscan()
         print "Odom data reading..."
         self.readodom()
-        print "Sync..."
+        print "Data sync..."
         self.sync()
+        print "All ready."
         self.bag.close()
 
     def readscan(self):
@@ -56,8 +59,11 @@ class BagReader:
 
     def sync(self):
         idx = 0
-        start_time =self.points[0][0] + rospy.Duration(80, 0)
+        start_time =self.points[0][0] + rospy.Duration(self.start_time, 0)
+        end_time =self.points[0][0] + rospy.Duration(self.end_time, 0)
         for time_stamp_scan,scan_data in self.points:
+            if time_stamp_scan > end_time:
+                    break
             if time_stamp_scan < start_time:
                 continue
             time_stamp_odom,odom_data = self.odoms[idx]
@@ -72,14 +78,17 @@ class BagReader:
 
 class GUI(object):
     def __init__(self, bagreader):
+        print "You can use keyboard(left/right) or botton to play bag file."
         self.idx = 0
         self.data = bagreader.data
         self.fig, self.ax = plt.subplots()
         self.ax.set_xlim([-10,10])
         self.ax.set_ylim([-10,10])
-        axprev = plt.axes([0.7, 0.05, 0.1, 0.075])
-        axnext = plt.axes([0.81, 0.05, 0.1, 0.075])
-        tmp = tf.transformations.euler_matrix(0.0, 0.0, 3.)
+        self.ax.get_xaxis().set_visible(False)
+        self.ax.get_yaxis().set_visible(False)
+        axprev = plt.axes([0.7, 0.02, 0.1, 0.055])
+        axnext = plt.axes([0.81, 0.02, 0.1, 0.055])
+        tmp = tf.transformations.euler_matrix(0.0, 0.0, -0.8)
         tmp[0,3] = 0.15
         self.scan_base = np.matrix(tmp)
         self.init_pose = np.matrix([[0],[0],[0],[1]])
@@ -88,64 +97,31 @@ class GUI(object):
         bnext.on_clicked(self.next)
         bprev = Button(axprev, 'Previous')
         bprev.on_clicked(self.prev)
-        self.i = 0
+        self.fig.canvas.mpl_connect('key_press_event', self.press)
         plt.show()
 
     def next(self, event):
-        try:
-            self.scan_show.remove()
-            self.odom_show.remove()
-        except:
-            pass
-            """
-        self.i += 0.2
-        scan = self.data[self.idx][0]
-        odom = np.matrix(self.data[self.idx][1])
-        scan_size = scan.shape[0]
-        scan = scan.transpose()
-        tmp = np.zeros((1, scan_size))
-        scan = np.vstack([scan, tmp])
-        tmp.fill(1)
-        scan = np.vstack([scan, tmp])
-        scan = np.matrix(scan)
-        tmp = tf.transformations.euler_matrix(0.0, 0.0, self.i)
-        R = np.matrix(tmp)
-        scan = odom*R*scan
-        print self.i%3.1415926
-        scan = odom*scan
-        curp = odom*self.init_pose 
-        v = np.matrix([[1],[0]])
-        v= odom[0:2,0:2]*v
-        self.odom_show = self.ax.quiver(curp[0,0], curp[1,0], v[0,0], v[1,0], units='width')
-        self.scan_show = self.ax.scatter(scan[0,:],scan[1,:])
-        plt.draw()
-"""
         self.idx += 1
-        scan = self.data[self.idx][0]
-        odom = np.matrix(self.data[self.idx][1])
-        scan_size = scan.shape[0]
-        scan = scan.transpose()
-        tmp = np.zeros((1, scan_size))
-        scan = np.vstack([scan, tmp])
-        tmp.fill(1)
-        scan = np.vstack([scan, tmp])
-        scan = np.matrix(scan)
-        scan = odom*self.scan_base*scan
-        scan = odom*scan
-        curp = odom*self.init_pose 
-        v = np.matrix([[1],[0]])
-        v= odom[0:2,0:2]*v
-        self.odom_show = self.ax.quiver(curp[0,0], curp[1,0], v[0,0], v[1,0], units='width')
-        self.scan_show = self.ax.scatter(scan[0,:],scan[1,:])
-        plt.draw()
+        self.update()
 
     def prev(self, event):
+        self.idx -= 1
+        self.update()
+
+    def press(self, event):
+        if event.key == 'left':
+            self.idx -= 1
+            self.update()
+        elif event.key == 'right':
+            self.idx += 1
+            self.update()          
+
+    def update(self):
         try:
-            self.scan_show.remove()
+            self.curscan_show.remove()
             self.odom_show.remove()
         except:
             pass
-        self.idx -= 1
         scan = self.data[self.idx][0]
         odom = np.matrix(self.data[self.idx][1])
         scan_size = scan.shape[0]
@@ -160,10 +136,10 @@ class GUI(object):
         v = np.matrix([[1],[0]])
         v= odom[0:2,0:2]*v
         self.odom_show = self.ax.quiver(curp[0,0], curp[1,0], v[0,0], v[1,0], units='width')
-        self.scan_show = self.ax.scatter(scan[0,:],scan[1,:])
+        self.scan_show = self.ax.scatter(scan[0,:],scan[1,:],c='g', s=5)
+        self.curscan_show = self.ax.scatter(scan[0,:],scan[1,:],c='r', s=10)
         plt.draw()
 
 
-
-bagreader = BagReader('h1.bag', '/Rulo/laser_scan', '/Rulo/odom')
+bagreader = BagReader('h1.bag', '/Rulo/laser_scan', '/Rulo/odom',80,800)
 gui = GUI(bagreader)
